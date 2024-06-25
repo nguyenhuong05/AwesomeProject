@@ -1,5 +1,6 @@
 import {useNavigation} from '@react-navigation/native';
-import React, {useState} from 'react';
+import {createClient} from '@supabase/supabase-js';
+import React, {useEffect, useState} from 'react';
 import {
   StyleSheet,
   TextInput,
@@ -8,9 +9,13 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
+import 'react-native-url-polyfill/auto';
 
 const TemperatureScreen = () => {
   const navigation = useNavigation();
+
+  const [temperatureToOpenFan, setTemperatureToOpenFan] = useState('');
+
   const [temperature, setTemperature] = useState('');
   const [displayText, setDisplayText] = useState('');
 
@@ -21,11 +26,67 @@ const TemperatureScreen = () => {
     setDisplayText(`${temperature}°C`);
   };
   const goToFanScreen = () => {
-    navigation.navigate('FanScreen' as never);
+    navigation.navigate(
+      'FanScreen' as never,
+      {
+        temperatureToOpenFan: temperatureToOpenFan,
+        currentTem: temperature,
+      } as never,
+    );
   };
+
+  const supabaseUrl = 'https://atamzgfzgyynoqqdnbup.supabase.co';
+  const supabaseKey =
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF0YW16Z2Z6Z3l5bm9xcWRuYnVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTkyOTg0NDEsImV4cCI6MjAzNDg3NDQ0MX0.Ner2Wvuop0mILVgNkhI_Q0_XNgzC32pKRTkAhQlWA2I';
+  const supabase = createClient(supabaseUrl, supabaseKey, {
+    auth: {
+      detectSessionInUrl: false,
+    },
+  });
+
+  const fetchData = async () => {
+    const {data, error} = await supabase
+      .schema('public')
+      .from('temperature')
+      .select('*')
+      .order('id', {ascending: false})
+      .limit(1);
+
+    if (error) {
+      console.error(error);
+    } else {
+      console.log('Data', data);
+      setTemperatureToOpenFan(data[0].value);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  useEffect(() => {
+    const channels = supabase
+      .channel('custom-all-channel')
+      .on(
+        'postgres_changes',
+        {event: '*', schema: 'public', table: 'temperature'},
+        payload => {
+          console.log('Change received!', payload);
+          fetchData();
+        },
+      )
+      .subscribe();
+    return () => {
+      channels.unsubscribe();
+    };
+    // return channels.unsubscribe();
+  }, []);
 
   return (
     <SafeAreaView style={styles.container}>
+      <Text style={styles.textdisplay}>
+        Ngưỡng tự động bật : {temperatureToOpenFan}
+      </Text>
       <Text style={styles.textdisplay}>Nhiệt độ trong phòng hiện tại</Text>
       <View style={styles.circle}>
         <Text style={styles.circleText}>{displayText || '0°C'}</Text>

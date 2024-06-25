@@ -1,10 +1,19 @@
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {View, Switch, StyleSheet, Image, Text} from 'react-native';
 import {images} from '../../assets/image/const';
+import {useRoute} from '@react-navigation/native';
 
 const FanScreen = () => {
   const [isEnabled, setIsEnabled] = useState(false);
   const toggleSwitch = () => setIsEnabled(previousState => !previousState);
+  const route = useRoute();
+  const params = route.params as any;
+
+  useEffect(() => {
+    if (Number(params?.currentTem) >= Number(params?.temperatureToOpenFan)) {
+      setIsEnabled(true);
+    }
+  }, [params]);
 
   return (
     <View style={styles.container}>
